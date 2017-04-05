@@ -20,6 +20,8 @@
   "dependencies": {
     "math": "0.0.3",
     "mathjs": "^3.10.1",
+    "sylvester": "0.0.21",
+    "sylvester-es6": "0.0.2",
     "webpack": "^2.3.2"
   }
 }
