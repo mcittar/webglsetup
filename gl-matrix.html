@@ -1,0 +1,482 @@
+<html>
+
+<title>WebGL Test</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<link href="styles.css" type="text/css" rel="stylesheet">
+
+<!-- Load the math library -->
+<script type="text/javascript" src="../shared/glMatrix-0.9.5.min.js"></script>
+
+<!-- Utils lib -->
+<script type="text/javascript" src="../shared/webgl-utils.js"></script>
+
+<!-- Load gui lib -->
+<script type="text/javascript" src="../shared/dat.gui.min.js"></script>
+
+<!-- Load noise lib -->
+<script src='../shared/perlin.js'></script>
+
+<!-- Fragment shader -->
+<script id="shader-fs_mandelbrot" type="wgl-shader/frag">
+
+	#define iterations MAX_ITER
+
+	precision highp float;
+
+	varying vec2 texcoord;
+
+	uniform sampler2D uSampler;
+	uniform vec2 center;
+	uniform float zoom;
+	uniform vec2 c;
+
+	void main(void)
+	{
+		// Mandelbrot
+		vec2 C = vec2(1.0, 0.75) * (texcoord - vec2(0.5, 0.5)) * vec2(zoom, zoom) - center;
+		vec2 z = C;
+
+		gl_FragColor = vec4(0,0,0,1);
+
+		for(float i = 0.0; i < float(iterations); i += 1.0)
+		{
+			z = vec2( z.x*z.x - z.y*z.y, 2.0 * z.x * z.y) + C;
+			if(dot(z,z) > 4.0)
+			{
+				gl_FragColor = texture2D(uSampler, vec2(i / float(iterations), 0.5));
+				break;
+			}
+		}
+	}
+</script>
+
+<!-- Fragment shader -->
+<script id="shader-fs_julia" type="wgl-shader/frag">
+
+	#define iterations MAX_ITER
+
+	precision highp float;
+
+	varying vec2 texcoord;
+
+	uniform sampler2D uSampler;
+	uniform vec2 center;
+	uniform float zoom;
+	uniform vec2 c;
+
+	void main(void)
+	{
+		// Julia
+		//const vec2 c = vec2(-0.7, 0.27015);
+		vec2 z = vec2(1.0, 0.75) * (texcoord - vec2(0.5, 0.5)) * vec2(zoom, zoom) - center;
+
+		gl_FragColor = vec4(0,0,0,1);
+
+		for(float i = 0.0; i < float(iterations); i += 1.0)
+		{
+			z = vec2( z.x*z.x - z.y*z.y, 2.0 * z.x * z.y) + c;
+			if(dot(z,z) > 4.0)
+			{
+				gl_FragColor = texture2D(uSampler, vec2(i / float(iterations), 0.5));
+				break;
+			}
+		}
+	}
+</script>
+
+<!-- Vertex shader -->
+<script id="shader-vs" type="wgl-shader/vert">
+	attribute vec3 vtx_pos;
+	attribute vec2 vtx_uv;
+
+	varying vec2 texcoord;
+
+	void main(void)
+	{
+		texcoord = vtx_uv;
+		gl_Position = vec4(vtx_pos, 1.0);
+	}
+</script>
+
+<script type="text/javascript">
+	var gl;
+
+	var globalMousePos = [0, 0];
+	var mouseDownStartPos = [0,0];
+	var isMouseDown = false;
+	domousemove = function(event) {
+	    if(isMouseDown)
+	    {
+	    	var currentMousePos = [event.pageX, event.pageY];
+	    	var difference = [ 	currentMousePos[0] - mouseDownStartPos[0],
+	    					 	currentMousePos[1] - mouseDownStartPos[1] ];
+
+	    	globalMousePos[0] += difference[0] * options.Zoom * (1/1000);
+	    	globalMousePos[1] -= difference[1] * options.Zoom * (1/1000);
+1
+	    	tick();
+	    }
+	};
+	domousedown = function(event) {
+		if(!isMouseDown)
+		{
+			mouseDownStartPos = [event.pageX, event.pageY];
+			isMouseDown = true;
+		}
+	};
+
+	domouseup = function(event) {
+	    isMouseDown = false;
+	};
+
+	domousescroll = function(event)
+	{
+		var rolled;
+		rolled = event.wheelDelta;
+
+		if(rolled > 0)
+		{
+			options.Zoom -= 0.001;
+		}
+		else
+		{
+			options.Zoom += 0.001;
+		}
+
+		tick();
+	}
+
+	dodommousescroll = function(event)
+	{
+		var rolled;
+        rolled = -40 * event.detail;
+
+		if(rolled > 0)
+		{
+			options.Zoom -= 0.0001;
+		}
+		else
+		{
+			options.Zoom += 0.0001;
+		}
+
+		tick();
+	}
+
+	function initGL(canvas)
+{
+                try
+                {
+                  gl = canvas.getContext("webgl");
+                }
+                catch (x)
+                {
+                  gl = null;
+                }
+
+                if (gl == null)
+                {
+                  try
+                  {
+                    gl = canvas.getContext("experimental-webgl");
+                    experimental = true;
+                  }
+                  catch (x)
+                  {
+                    gl = null;
+                  }
+                }
+
+		if(!gl)
+		{
+			alert("Error initialising webgl");
+		}
+                else
+                {
+			gl.viewportWidth = canvas.width;
+			gl.viewportHeight = canvas.height;
+                }
+	}
+
+	function loadShader(gl, id)
+	{
+		var shaderScript = document.getElementById(id);
+		if(!shaderScript)
+		{
+			return null;
+		}
+
+		var str = "";
+		var k = shaderScript.firstChild;
+		while(k)
+		{
+			if(k.nodeType == 3)
+			{
+				str += k.textContent;
+			}
+
+			k = k.nextSibling;
+		}
+
+		var shader;
+		if(shaderScript.type == "wgl-shader/frag")
+		{
+			str = str.replace("MAX_ITER", options.Iterations.toString() );
+			shader = gl.createShader(gl.FRAGMENT_SHADER);
+		}
+		else if(shaderScript.type == "wgl-shader/vert")
+		{
+			shader = gl.createShader(gl.VERTEX_SHADER);
+		}
+		else
+		{
+			return null;
+		}
+
+		gl.shaderSource(shader, str);
+		gl.compileShader(shader);
+
+		if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+		{
+			alert(gl.getShaderInfoLog(shader));
+			return null;
+		}
+
+		return shader;
+	}
+
+
+	var shaderProgram;
+
+	function initShaders()
+	{
+		var fragShader = options.Julia ? loadShader(gl, "shader-fs_julia") : loadShader(gl, "shader-fs_mandelbrot");
+		var vertShader = loadShader(gl, "shader-vs");
+
+		shaderProgram = gl.createProgram();
+		gl.attachShader(shaderProgram, vertShader);
+		gl.attachShader(shaderProgram, fragShader);
+		gl.linkProgram(shaderProgram);
+
+		if(!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS))
+		{
+			alert("Couldn't initialise shaders");
+		}
+
+		gl.useProgram(shaderProgram);
+
+		shaderProgram.vtxPosAttrib = gl.getAttribLocation(shaderProgram, "vtx_pos");
+		gl.enableVertexAttribArray(shaderProgram.vtxPosAttrib);
+
+		shaderProgram.vtxUVAttrib = gl.getAttribLocation(shaderProgram, "vtx_uv");
+		gl.enableVertexAttribArray(shaderProgram.vtxUVAttrib);
+
+		shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+		shaderProgram.centerUniform = gl.getUniformLocation(shaderProgram, "center");
+		shaderProgram.zoomUniform = gl.getUniformLocation(shaderProgram, "zoom");
+		shaderProgram.cUniform = gl.getUniformLocation(shaderProgram, "c");
+	}
+
+	var mvMatrix = mat4.create();
+	var pMatrix = mat4.create();
+	function setMatrixUniforms()
+	{
+		gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+		gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+	}
+
+
+	var quadbuffer_vtx = [];
+	var quadbuffer_uv = [];
+	function initBuffers()
+	{
+		var quadVtx = [
+			-1,	-1, 0,
+			1,	-1,	0,
+			1,	1,	0,
+			-1,	-1, 0,
+			-1,	1,	0,
+			1,	1,	0,
+		];
+
+		quadbuffer_vtx = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_vtx);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVtx), gl.STATIC_DRAW);
+		quadbuffer_vtx.itemSize = 3;
+		quadbuffer_vtx.numItems = quadVtx.length / quadbuffer_vtx.itemSize;
+
+		var quadUV = [
+			0,	0,
+			1,	0,
+			1,	1,
+			0,	0,
+			0,	1,
+			1,	1,
+		]
+
+		quadbuffer_uv = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_uv);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadUV), gl.STATIC_DRAW);
+		quadbuffer_uv.itemSize = 2;
+		quadbuffer_uv.numItems = quadUV.length / quadbuffer_uv.itemSize;
+	}
+
+	var paletteTexture;
+	function initTextures()
+	{
+		paletteTexture = gl.createTexture();
+		paletteTexture.image = new Image();
+		paletteTexture.image.onload = function()
+		{
+			handleLoadedTexture(paletteTexture);
+		}
+
+		paletteTexture.image.src = "palette.png";
+	}
+
+	function handleLoadedTexture(texture)
+	{
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null); //unbind
+
+		tick();
+	}
+
+	function distanceSqr(a, b)
+	{
+		return (b[0] - a[0])*(b[0] - a[0]) +
+			   (b[1] - a[1])*(b[1] - a[1]) +
+			   (b[2] - a[2])*(b[2] - a[2]);
+	}
+
+	function getmidpoint(a, b)
+	{
+		return [ (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+	}
+
+	function drawScene()
+	{
+		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
+		gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+		gl.uniform1f(shaderProgram.zoomUniform, 2 - options.Zoom);
+
+		gl.uniform2fv(shaderProgram.centerUniform, new Float32Array(globalMousePos));
+
+		gl.uniform2fv(shaderProgram.cUniform, new Float32Array( [options.ComplexReal, options.ComplexImag] ));
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_uv);
+		gl.vertexAttribPointer(shaderProgram.vtxUVAttrib, quadbuffer_uv.itemSize, gl.FLOAT, false, 0, 0);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_vtx);
+		gl.vertexAttribPointer(shaderProgram.vtxPosAttrib, quadbuffer_vtx.itemSize, gl.FLOAT, false, 0, 0);
+
+		gl.drawArrays(gl.TRIANGLES, 0, quadbuffer_vtx.numItems);
+	}
+
+	function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    var time = 0;
+    var lastTime = 0;
+	function animate() {
+        var timeNow = new Date().getTime();
+        if (lastTime != 0) {
+            var elapsed = timeNow - lastTime;
+
+            drawScene();
+            time = time + 1.0;
+        }
+        lastTime = timeNow;
+    }
+
+    function tick() {
+    	//requestAnimFrame(tick);
+    	drawScene();
+    }
+
+	var options = new function()
+	{
+		this.Zoom = 0.5;
+		this.Iterations = 100;
+		this.ComplexReal = -0.7;
+		this.ComplexImag = 0.27015;
+		this.Julia = false;
+	}
+
+	function main()
+	{
+		var canvas = document.getElementById("webgl-canvas");
+
+		canvas.addEventListener("mousedown", 	domousedown, 	false);
+		canvas.addEventListener("mouseup", 		domouseup, 		false);
+		canvas.addEventListener("mousemove", 	domousemove, 	false);
+		//canvas.addEventListener("mousewheel", 	domousescroll, 	false);
+		canvas.addEventListener("DOMMouseScroll", dodommousescroll, 	false);
+
+		initGL(canvas);
+		initShaders();
+		initBuffers();
+		initTextures();
+
+		var gui = new dat.GUI({
+		    height : 5 * 32 - 1
+		});
+
+		gui.add(options, 'Zoom').step(0.00001).min(0).max(1.999999).onChange( function(value)
+		{
+			options.Zoom = value;
+			tick();
+		});
+
+		gui.add(options, 'Iterations').min(1).max(1500).step(2).onChange( function(value)
+		{
+			initShaders();
+
+			tick();
+		});
+
+		gui.add(options, 'Julia').onChange( function(value)
+		{
+				options.Julia = value;
+				initShaders();
+				tick();
+		})
+
+		gui.add(options, 'ComplexReal').step(0.00000001).min(-1.5).max(0.5).onChange( function(value)
+		{
+			options.ComplexReal = value;
+			tick();
+		});
+
+		gui.add(options, 'ComplexImag').step(0.00000001).min(-1).max(1).onChange( function(value)
+		{
+			options.ComplexImag = value;
+			tick();
+		});
+
+
+		gl.clearColor(0.1, 0.1, 0.1, 1.0);
+
+	}
+
+
+</script>
+
+<body onload="main();">
+
+<canvas id="webgl-canvas" style="border: none;" width="1024" height="768"></canvas>
+
+</body>
+
+</html>

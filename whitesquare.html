@@ -78,8 +78,8 @@
         primitiveType: gl.TRIANGLE_STRIP
       };
 
-      var vertexBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+      var vertexBuffer = gl.createBuffer();  // Creates Buffer from WebGl
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); // Activates Buffer
 
       program.positionAttribute = gl.getAttribLocation(program, 'pos');
       gl.enableVertexAttribArray(program.positionAttribute);
