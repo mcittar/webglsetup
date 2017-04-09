@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Hacking WebGL</title>
+
     <script type="x-shader/x-vertex" id="vertex-shader">
     precision mediump float;
     attribute vec2 pos;
@@ -12,6 +13,7 @@
       gl_Position = vec4(pos, 0.0, 1.0);
     }
     </script>
+
     <script type="x-shader/x-fragment" id="fragment-shader">
     precision mediump float;
     varying vec3 col;
@@ -19,11 +21,10 @@
       gl_FragColor = vec4(col, 1.0);
     }
     </script>
+
     <script type="text/javascript">
 
     function render(gl,scene) {
-
-
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(scene.program);
       gl.bindBuffer(gl.ARRAY_BUFFER, scene.object.vertexBuffer);
@@ -37,7 +38,28 @@
       });
     }
 
-    function initWebGL() {
+    function createProgram(gl, shaderSpecs) {
+      var program = gl.createProgram();
+      for ( var i = 0 ; i < shaderSpecs.length ; i++ ) {
+        var spec = shaderSpecs[i];
+        var shader = gl.createShader(spec.type);
+        var source = document.getElementById(spec.container).text;
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          throw gl.getShaderInfoLog(shader);
+        }
+        gl.attachShader(program, shader);
+        gl.deleteShader(shader);
+      }
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw gl.getProgramInfoLog(program);
+      }
+      return program;
+    }
+
+    function init() {
       var surface = document.getElementById('rendering-surface');
       var gl = surface.getContext('experimental-webgl');
       gl.viewport(0,0,surface.width,surface.height);
@@ -49,14 +71,14 @@
          {container: 'fragment-shader', type: gl.FRAGMENT_SHADER}]
       );
 
-      gl.useProgram(program);
-
       var squareVertices = [
-        +1.0, +1.0, 0.0, +1.0, +0.0,
-        -1.0, +1.0, 0.0, +1.0, +1.0,
-        +1.0, -1.0, 0.0, +0.0, +1.0,
-        -1.0, -1.0, 0.0, +0.5, +0.5
+        +0.75, +0.75, 0.0, +1.0, +0.0,
+        -0.75, +0.75, 0.0, +1.0, +1.0,
+        +0.75, -0.75, 0.0, +0.0, +1.0,
+        -0.75, -0.75, 0.0, +0.5, +0.5
       ];
+
+      gl.useProgram(program);
 
       var square = {
         vertexCount: 4,
@@ -66,21 +88,12 @@
       var vertexBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 
-
-      shaderProgram.vtxPosAttrib = gl.getAttribLocation(program, "vtx_pos");
-  		gl.enableVertexAttribArray(shaderProgram.vtxPosAttrib);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_vtx);
-  		gl.vertexAttribPointer(program.vtxPosAttrib, quadbuffer_vtx.itemSize, gl.FLOAT, false, 0, 0);
-
-
-
       program.positionAttribute = gl.getAttribLocation(program, 'pos');
       gl.enableVertexAttribArray(program.positionAttribute);
       gl.vertexAttribPointer(
         program.positionAttribute, 2, gl.FLOAT, false,
         Float32Array.BYTES_PER_ELEMENT * 5, 0);
-
+        
       program.colourAttribute = gl.getAttribLocation(program, 'colour');
       gl.enableVertexAttribArray(program.colourAttribute);
       gl.vertexAttribPointer(
@@ -108,35 +121,9 @@
         render(gl, scene);
       });
     }
-
-    function createProgram(gl, shaderSpecs) {
-      var program = gl.createProgram();
-      for ( var i = 0 ; i < shaderSpecs.length ; i++ ) {
-        var spec = shaderSpecs[i];
-        var shader = gl.createShader(spec.type);
-        var source = document.getElementById(spec.container).text;
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-          throw gl.getShaderInfoLog(shader);
-        }
-        gl.attachShader(program, shader);
-        gl.deleteShader(shader);
-      }
-      gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        throw gl.getProgramInfoLog(program);
-      }
-      return program;
-    }
-
-    function initShaders(){
-
-    }
-    
     </script>
   </head>
-  <body onLoad="initWebGL()">
+  <body onLoad="init()">
     <canvas id="rendering-surface" height="500" width="500"/>
   </body>
 </html>
