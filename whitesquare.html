@@ -4,26 +4,40 @@
     <title>Hacking WebGL</title>
 
     <script type="x-shader/x-vertex" id="vertex-shader">
+
+    #define iterations MAX_ITER
     precision mediump float;
-    attribute vec2 pos;
-    attribute vec3 colour;
-    varying vec3 col;
 
     attribute vec3 vtx_pos;
     attribute vec2 vtx_uv;
     varying vec2 texcoord;
 
     void main() {
-      col = colour;
-      gl_Position = vec4(pos, 0.0, 1.0);
+      texcoord = vtx_uv;
+      gl_Position = vec4(vtx_pos, 1.0);
     }
     </script>
 
     <script type="x-shader/x-fragment" id="fragment-shader">
+
+    const int iterations = 300;
     precision mediump float;
-    varying vec3 col;
+    varying vec2 texcoord;
+    uniform sampler2D uSampler;
+    uniform vec2 c;
+
     void main() {
-      gl_FragColor = vec4(col, 1.0);
+      vec2 z = vec2(1.0, 0.75) * (texcoord - vec2(0.5, 0.5));
+
+  		gl_FragColor = vec4(0,0,0,1);
+      //
+  		for(float i = 0.0; i < float(iterations); i += 1.0) {
+  			z = vec2( z.x*z.x - z.y*z.y, 2.0 * z.x * z.y) + c;
+  			if(dot(z,z) > 4.0) {
+  				gl_FragColor = texture2D(uSampler, vec2(i / float(iterations), 0.5));
+  				break;
+  			}
+  		}
     }
     </script>
 
@@ -32,6 +46,15 @@
     function render(gl,scene) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(scene.program);
+
+      gl.activeTexture(gl.TEXTURE0);
+  		gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
+  		gl.uniform1i(scene.program.samplerUniform, 0);
+
+      let options = [-0.221, -0.713]
+
+      gl.uniform2fv(scene.program.cUniform, new Float32Array(options));
+
       gl.bindBuffer(gl.ARRAY_BUFFER, scene.object.vertexBuffer);
       gl.drawArrays(
         scene.object.primitiveType, 0,
@@ -43,9 +66,43 @@
       });
     }
 
+    var paletteTexture;
+    function initTextures(gl) {
+      paletteTexture = gl.createTexture();
+      paletteTexture.image = new Image();
+      paletteTexture.image.onload = function() {
+        handleLoadedTexture(gl, paletteTexture);
+      }
+      paletteTexture.image.src = "pal.png";
+    }
 
+    function handleLoadedTexture(gl, texture) {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.bindTexture(gl.TEXTURE_2D, null); //unbind
+    }
+
+    function onMouseMove(e) {
+    let pos = getMousePos(e);
+    console.log(pos);
+    let constantReal = (pos.x - (surface.width / 2)) / surface.width / 2;
+    let constantImaginary = (pos.y - (surface.height / 2)) / surface.width / 2;
+  }
+
+    function getMousePos(e) {
+      let rect = surface.getBoundingClientRect();
+      return {
+      x: Math.round((e.clientX - rect.left) / (rect.right - rect.left) * surface.width),
+      y: Math.round((e.clientY - rect.top) / (rect.bottom - rect.top) * surface.height)
+    };
+  }
+    var surface;
     function initWebGL() {
-      var surface = document.getElementById('rendering-surface');
+      surface = document.getElementById('rendering-surface');
+      surface.addEventListener('mousemove', onMouseMove);
       var gl = surface.getContext('experimental-webgl');
       gl.viewport(0,0,surface.width,surface.height);
       gl.clearColor(1.0, 0.0, 0.0, 1.0);
@@ -56,44 +113,7 @@
          {container: 'fragment-shader', type: gl.FRAGMENT_SHADER}]
       );
 
-      var squareVertices = [
-        +0.75, +0.75, 0.0, +1.0, +0.0,
-        -0.75, +0.75, 0.0, +1.0, +1.0,
-        +0.75, -0.75, 0.0, +0.0, +1.0,
-        -0.75, -0.75, 0.0, +0.5, +0.5
-      ];
-
       gl.useProgram(program);
-
-      var square = {
-        vertexCount: 4,
-        primitiveType: gl.TRIANGLE_STRIP
-      };
-
-      var vertexBuffer = gl.createBuffer();  // Creates Buffer from WebGl
-      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); // Activates Buffer
-
-
-      gl.enableVertexAttribArray(program.positionAttribute);
-      gl.vertexAttribPointer(
-        program.positionAttribute, 2, gl.FLOAT, false,
-        Float32Array.BYTES_PER_ELEMENT * 5, 0
-      );
-
-      gl.enableVertexAttribArray(program.colourAttribute);
-      gl.vertexAttribPointer(
-        program.colourAttribute, 3, gl.FLOAT, false,
-        Float32Array.BYTES_PER_ELEMENT * 5,
-        Float32Array.BYTES_PER_ELEMENT * 2
-      );
-
-      gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array(squareVertices),
-        gl.STATIC_DRAW
-      );
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
       var quadVtx = [
   			-1,	-1, 0,
@@ -105,11 +125,11 @@
   		];
 
       quadbuffer_vtx = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_vtx);
-      program.vtxPosAttribute = 0;
-      console.log(program.vtxPosAttribute);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_vtx);;
       gl.enableVertexAttribArray(program.vtxPosAttrib);
       gl.vertexAttribPointer(program.vtxPosAttrib, 3, gl.FLOAT, false, 0, 0)
+      quadbuffer_vtx.itemSize = 3;
+  		quadbuffer_vtx.numItems = quadVtx.length / quadbuffer_vtx.itemSize;
 
       gl.bufferData(
         gl.ARRAY_BUFFER,
@@ -117,15 +137,44 @@
         gl.STATIC_DRAW
       );
 
+      var quadUV = [
+  			0,	0,
+  			1,	0,
+  			1,	1,
+  			0,	0,
+  			0,	1,
+  			1,	1,
+  		]
+
+      quadbuffer_uv = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadbuffer_uv);
+      gl.enableVertexAttribArray(program.vtxUVAttrib);
+      gl.vertexAttribPointer(program.vtxUVAttrib, 2, gl.FLOAT, false, 0, 0)
+      quadbuffer_uv.itemSize = 2;
+  		quadbuffer_uv.numItems = quadUV.length / quadbuffer_uv.itemSize;
+
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(quadUV),
+        gl.STATIC_DRAW
+      );
+
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
       gl.useProgram(null);
 
-      square.vertexBuffer = vertexBuffer;
+      var square = {
+        vertexCount: quadbuffer_vtx.numItems,
+        primitiveType: gl.TRIANGLES
+      };
+
+      square.vertexBuffer = quadbuffer_vtx;
 
       var scene = {
         program: program,
         object: square,
       };
+
+      initTextures(gl);
 
       requestAnimationFrame(function() {
         render(gl, scene);
@@ -150,15 +199,17 @@
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         throw gl.getProgramInfoLog(program);
       }
-      program.positionAttribute = gl.getAttribLocation(program, 'pos');
-      program.colourAttribute = gl.getAttribLocation(program, 'colour');
       program.vtxPosAttribute = gl.getAttribLocation(program, 'vtx_pos');
+      program.vtxUVAttrib = gl.getAttribLocation(program, "vtx_uv");
+      program.samplerUniform = gl.getUniformLocation(program, "uSampler");
+      program.cUniform = gl.getUniformLocation(program, "c");
+
       return program;
     }
 
     </script>
   </head>
   <body onLoad="initWebGL()">
-    <canvas id="rendering-surface" height="500" width="500"/>
+    <canvas id="rendering-surface" height="1000" width="1000"/>
   </body>
 </html>
