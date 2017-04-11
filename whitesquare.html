@@ -27,17 +27,18 @@
     uniform vec2 c;
 
     void main() {
-      vec2 z = vec2(1.0, 0.75) * (texcoord - vec2(0.5, 0.5));
+      vec2 z = vec2(2.6, 2.6) * (texcoord - vec2(0.5, 0.5));
 
   		gl_FragColor = vec4(0,0,0,1);
-      //
-  		for(float i = 0.0; i < float(iterations); i += 1.0) {
-  			z = vec2( z.x*z.x - z.y*z.y, 2.0 * z.x * z.y) + c;
+
+  		for(float i = 0.0; i < float(iterations); i++) {
+  			z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
   			if(dot(z,z) > 4.0) {
   				gl_FragColor = texture2D(uSampler, vec2(i / float(iterations), 0.5));
   				break;
   			}
   		}
+
     }
     </script>
 
@@ -71,7 +72,7 @@
       paletteTexture.image.onload = function() {
         handleLoadedTexture(gl, paletteTexture);
       }
-      paletteTexture.image.src = "pal.png";
+      paletteTexture.image.src = "aneurism.png";
     }
 
     function handleLoadedTexture(gl, texture) {
@@ -87,8 +88,10 @@
       let pos = getMousePos(e);
       let widthHalved = surface.width / 2;
       let heightHalved = surface.height / 2;
-      let constantReal = ((pos.x - (widthHalved)) / widthHalved) - 0.5;
-      let constantImaginary = (pos.y - (heightHalved)) / heightHalved;
+      // let constantReal = ((pos.x - (widthHalved)) / widthHalved);
+      let constantReal = pos.x / surface.width * 2 - 1;
+      // let constantImaginary = (pos.y - (heightHalved)) / heightHalved;
+      let constantImaginary = 1 - pos.y / surface.height * 2;
       console.log(`Real ${constantReal}`);
       console.log(`Imaginary ${constantImaginary}`);
       options = [constantReal, constantImaginary];
