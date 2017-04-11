@@ -86,19 +86,22 @@
     }
 
     function onMouseMove(e) {
-    let pos = getMousePos(e);
-    console.log(pos);
-    let constantReal = (pos.x - (surface.width / 2)) / surface.width / 2;
-    let constantImaginary = (pos.y - (surface.height / 2)) / surface.width / 2;
-  }
+      let pos = getMousePos(e);
+      let widthHalved = surface.width / 2;
+      let heightHalved = surface.height / 2;
+      let constantReal = (pos.x - (widthHalved)) / widthHalved;
+      let constantImaginary = (pos.y - (heightHalved)) / heightHalved;
+      console.log(constantReal, constantImaginary);
+    }
 
     function getMousePos(e) {
       let rect = surface.getBoundingClientRect();
       return {
-      x: Math.round((e.clientX - rect.left) / (rect.right - rect.left) * surface.width),
-      y: Math.round((e.clientY - rect.top) / (rect.bottom - rect.top) * surface.height)
-    };
-  }
+        x: Math.round((e.clientX - rect.left) / (rect.right - rect.left) * surface.width),
+        y: Math.round((e.clientY - rect.top) / (rect.bottom - rect.top) * surface.height)
+      };
+    }
+
     var surface;
     function initWebGL() {
       surface = document.getElementById('rendering-surface');
