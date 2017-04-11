@@ -20,7 +20,7 @@
 
     <script type="x-shader/x-fragment" id="fragment-shader">
 
-    const int iterations = 300;
+    const int iterations = 200;
     precision mediump float;
     varying vec2 texcoord;
     uniform sampler2D uSampler;
@@ -42,7 +42,7 @@
     </script>
 
     <script type="text/javascript">
-
+    var options = [-0.221, -0.713]
     function render(gl,scene) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(scene.program);
@@ -50,8 +50,6 @@
       gl.activeTexture(gl.TEXTURE0);
   		gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
   		gl.uniform1i(scene.program.samplerUniform, 0);
-
-      let options = [-0.221, -0.713]
 
       gl.uniform2fv(scene.program.cUniform, new Float32Array(options));
 
@@ -89,9 +87,11 @@
       let pos = getMousePos(e);
       let widthHalved = surface.width / 2;
       let heightHalved = surface.height / 2;
-      let constantReal = (pos.x - (widthHalved)) / widthHalved;
+      let constantReal = ((pos.x - (widthHalved)) / widthHalved) - 0.5;
       let constantImaginary = (pos.y - (heightHalved)) / heightHalved;
-      console.log(constantReal, constantImaginary);
+      console.log(`Real ${constantReal}`);
+      console.log(`Imaginary ${constantImaginary}`);
+      options = [constantReal, constantImaginary];
     }
 
     function getMousePos(e) {
@@ -213,6 +213,6 @@
     </script>
   </head>
   <body onLoad="initWebGL()">
-    <canvas id="rendering-surface" height="1000" width="1000"/>
+    <canvas id="rendering-surface" height="500" width="500"/>
   </body>
 </html>
